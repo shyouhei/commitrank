@@ -1,6 +1,7 @@
 #! /usr/bin/ruby
 require 'svn/client'
 require 'tempfile'
+require 'date'
 
 # (1) get the data
 file = 'tmp.marshal'
@@ -13,7 +14,7 @@ rescue Errno::ENOENT
 	dat = Hash.new
 
 	Svn::Client::Context.new.log(
-		"svn+ssh://some.svnsync.server.to.ruby.repo/repos",
+		"svn+ssh://svn@ci.ruby-lang.org/ruby",
 		0, "head", 0, false, false
 	) {|_, rev, who, wheen, what|
 		t0 ||= wheen
@@ -33,7 +34,7 @@ end
 t = Time.now
 t1 = t - 24 * 60 * 60 * 365
 tmp = ''
-IO.popen("gnuplot -bg white", "w") do |fp|
+IO.popen("gnuplot", "w") do |fp|
 
 	# (3) preambles
 	fp.print <<-'end'
@@ -43,7 +44,7 @@ IO.popen("gnuplot -bg white", "w") do |fp|
 		set datafile missing '?'
 		set ytics (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192)
 		set logscale y
-		set term x11
+		set term wxt
 		set title 'Committer ranking'
 	end
 
@@ -106,12 +107,14 @@ IO.popen("gnuplot -bg white", "w") do |fp|
 
 	# (12) kick gnuplot.
 	# range e.g. 2010-Nov-01 -> Time.gm(1980-Nov-01).to_i
-	fp.printf "plot[328665600.0:360201600.0][32:2048] %s\n", a.join(", ")
+	t1 = Date.today
+	t2 = t1 << 12
+	fp.printf "plot[%f:%d][32:2048] %s\n", t2.to_time, t1.to_time, a.join(", ")
 	fp.flush
 	fp.write STDIN.gets
 	fp.print <<-'end'
 		set term svg fname 'M+ 2p' size 1366 768
-		set output '/dev/shm/tmp2.svg'
+		set output '/tmp/tmp2.svg'
 		replot
 	end
 	fp.printf "quit\n"
