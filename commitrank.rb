@@ -42,11 +42,13 @@ IO.popen("gnuplot", "w") do |fp|
 		set xdata time
 		set timefmt "%s"
 		set datafile missing '?'
-		set ytics (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192)
+		set ytics (0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8)
 		set logscale y
 		set term wxt
 		set title 'Committer ranking'
 	end
+
+	yr = 24 * 60 * 60 * 365.2277
 
 	# (4) main loop
 	c2p = dat.inject Hash.new do |r, (who, wheen)|
@@ -66,10 +68,11 @@ IO.popen("gnuplot", "w") do |fp|
 			# (7) accumulate commit counts (with attenuation)
 			wheen.each do |j|
 				break if j >= i
-				x += Math.exp((j - i).to_f / 31556925.2507328)
+				x += Math.exp((j - i) / yr)
 			end
 
 			# (8) print it.
+			x /= 365.2277
 			fq.printf "%d\t%f\n", i, x
 			STDERR.printf "%p %s %f\r", i, who, x
 		end
@@ -77,8 +80,9 @@ IO.popen("gnuplot", "w") do |fp|
 		# (9) last one
 		x = 0
 		wheen.each do |i|
-			x += Math.exp((i - t).to_f / 31556925.2507328)
+			x += Math.exp((i - t) / yr)
 		end
+		x /= 365.2277
 		fq.printf "%d\t%f\n", t, x
 
 		STDERR.puts
@@ -87,8 +91,8 @@ IO.popen("gnuplot", "w") do |fp|
 		fq.open
 
 		# (10) drop too low activists
-		next r if x < 32
-		str = sprintf '%8s:%7.2f', who, x
+		next r if x < 0.125
+		str = sprintf '%8s:%.7f', who, x
 		r[str] = [x, fq]
 		r
 	end
@@ -98,7 +102,7 @@ IO.popen("gnuplot", "w") do |fp|
 		set format x "%Y/%B"
 		set xtics 7884000
 		set mxtics 3
-		set ylabel 'Attenuating integral of commit counts'
+		set ylabel 'commits per day'
 	end
 	a = []
 	c2p.sort_by {|(who, (siz, path))| - siz }.each do |(who, (siz, path))|
@@ -109,7 +113,7 @@ IO.popen("gnuplot", "w") do |fp|
 	# range e.g. 2010-Nov-01 -> Time.gm(1980-Nov-01).to_i
 	t1 = Date.today
 	t2 = t1 << 12
-	fp.printf "plot[%f:%d][32:2048] %s\n", t2.to_time, t1.to_time, a.join(", ")
+	fp.printf "plot[%f:%d][0.125:] %s\n", t2.to_time, t1.to_time, a.join(", ")
 	fp.flush
 	fp.write STDIN.gets
 	fp.print <<-'end'
